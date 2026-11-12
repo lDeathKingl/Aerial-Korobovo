@@ -46,11 +46,11 @@ jobs:
         working-directory: upstream
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon :app:assembleGuardDebug
+          ./gradlew --no-daemon :app:assembleGuardRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: aerial-korobovo-test-apk
-          path: upstream/app/build/outputs/apk/guard/debug/*.apk
+          path: upstream/app/build/outputs/apk/guard/release/*.apk
           if-no-files-found: error
