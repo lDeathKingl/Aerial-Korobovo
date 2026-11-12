@@ -1,0 +1,56 @@
+name: Build Aerial Korobovo (test APK)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout weather patch
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Get Aerial 1.95 source
+        run: git clone --depth 1 --branch v1.95 https://github.com/pengchujin/aerial-tv.git upstream
+
+      - name: Apply Korobovo weather patch and isolate test package
+        run: |
+          cp patch/Weather.kt upstream/app/src/main/java/app/orchard/tv/weather/Weather.kt
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('upstream/app/build.gradle.kts')
+          src = p.read_text(encoding='utf-8')
+          old = 'create("guard") {\n'
+          assert src.count(old) == 1, 'Unexpected Aerial 1.95 Gradle config'
+          # The test APK must NEVER overwrite the installed official Aerial.
+          src = src.replace(old, old + '            applicationIdSuffix = ".korobovo"\n', 1)
+          p.write_text(src, encoding='utf-8')
+          PY
+
+      - name: Build isolated APK
+        working-directory: upstream
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:assembleGuardDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerial-korobovo-test-apk
+          path: upstream/app/build/outputs/apk/guard/debug/*.apk
+          if-no-files-found: error
